@@ -37,9 +37,7 @@ if __name__ == '__main__':
         elif args.dataset == 'cifar':
             global_model = CNNCifar(args=args)
     elif args.model == 'mlp':
-        # 图像大小
         img_size = train_dataset[0][0].shape
-        # 输入特征数
         len_in = 1
         for x in img_size:
             len_in *= x
@@ -53,313 +51,43 @@ if __name__ == '__main__':
 
     global_weights = global_model.state_dict()
     global_weights_ = copy.deepcopy(global_weights)
-    # print('---------- global_weights ----------')
-    # print(global_weights)
-    # for key,_ in global_weights.items():
-    #     print('key: ', key, '\t shape: ', global_weights[key].shape)
 
-
-    train_loss,train_accuracy = [],[]   # 每一轮的平均训练损失、精确率
+    train_loss,train_accuracy = [],[]
     val_acc_list,net_list = [],[]
     cv_loss,cv_acc = [],[]
-    # print_every = 2     # 每 print_every 轮打印训练后的全局信息
     val_loss_pre,counter = 0,0
 
-    ########################
-    rho, eta = 0.9, 0.01  # ρ 和 η
-    Monmentum = None  # 动量
-    error = None  # 压缩感知引入的误差
-    ########################
-    # 记录各客户端本地模型每一层的参数个数
     weights_numbers = copy.deepcopy(global_weights)
-
 
     for epoch in tqdm(list(range(args.epochs))):
 
         local_weights, local_losses = [], []
-        local_weights_ = []     # 记录压缩前的本地参数
+        local_weights_ = []
 
         print(f'\n | Global Training Round : {epoch + 1} |\n')
 
-
-        '''Step-1 : 服务器随机选择客户端执行本地训练'''
         global_model.train()
-
         m = max(int(args.frac * args.num_users),1)
-
         index_of_users = np.random.choice(list(range(args.num_users)), m, replace=False)
-
-        # 为客户端分配隐私预算
-        ########### 先假定每个客户端的隐私预算相同
-        # epsilon_user = args.epsilon
-        ###########
-
-
-        '''Step-2 : 客户端本地训练，用 for 循环模拟客户端“并行化”训练'''
-        index = 0   # 客户端序号（只是为了方便）
-
+        index = 0
 
         for k in index_of_users:
 
             local_model = LocalUpdate(args=args,dataset=train_dataset,
                                       index_of_samples=user_samples[k])
 
-
-            '''Step-2.1 : 客户端执行 SGD'''
             w,loss = local_model.local_train(
                 model=copy.deepcopy(global_model),global_round=epoch)
-            # for key,_ in w.items():
-            #     print(w[key].shape)
 
             local_weights_.append(copy.deepcopy(w))
 
-
-
-            if args.model == 'mlp':
+            if args.model == 'cnn':
                 for key,_ in list(w.items()):
-                    '''Step-2.2 : 压缩感知'''
-                    # # 获取当前层的参数个数
-                    # N = 1
-                    # for i in range(len(w[key].shape)):
-                    #     N *= w[key].shape[i]
-                    #
-                    # # 记录每一层的参数个数
-                    # weights_numbers[key] = torch.tensor(N)
-                    #
-                    # # M << N
-                    # M = int(N * args.compression_ratio)
-                    # # 测量矩阵
-                    # Phi = math.sqrt(1 / M) * torch.randn(M, N)
-                    # # 记录每一层使用的测量矩阵
-                    # Phi_log[key] = Phi
-                    #
-                    # # 压缩
-                    # y = torch.mm(Phi, w[key].reshape((-1,1)))
-                    #
-                    #
-                    # '''Step-2.3 : 自适应参数扰动'''
-                    # # epsilon 张量化
-                    # epsilon = epsilon_user + torch.zeros_like(y)
-                    #
-                    # # 获取每一层参数中的最小值和最大值
-                    # min_weight = torch.min(y)
-                    # max_weight = torch.max(y)
-                    # # 每一层权重或偏置的变化范围 [c-r,c+r]
-                    # center = (max_weight - min_weight) / 2  # + torch.zeros_like(y)
-                    # radius = max_weight - center  # + torch.zeros_like(y)
-                    # # 参数与 center 之间的距离 μ
-                    # miu = y - center
-                    #
-                    # # 伯努利采样概率 Pr[u=1]
-                    # # Pr = ((y - center) * (torch.exp(epsilon) - 1) + radius * (torch.exp(epsilon) + 1)) / 2 * radius * (torch.exp(epsilon) + 1)
-                    # # 伯努利变量
-                    # u = torch.bernoulli(torch.rand(y.shape))
-                    #
-                    # # 自适应扰动
-                    # for i in range(len(y)):
-                    #     if u[i] == 1.:
-                    #         y[i] = center + miu[i] * (math.exp(epsilon_user) + 1) / (math.exp(epsilon_user) - 1)
-                    #     elif u[i] == 0.:
-                    #         y[i] = center - miu[i] * (math.exp(epsilon_user) + 1) / (math.exp(epsilon_user) - 1)
-                    #
-                    # # 更新每一层扰动后的参数
-                    # w[key] = y
-
-
-                    ###################################################### 一行一行地处理
-                    # 获取当前层的参数张量的维度
-                    dim = w[key].ndim
-
-                    # 获取当前层的行数 rows 、每一行所拥有的参数个数 N
-                    if 1 < dim:
-                        rows = w[key].shape[0]
-                        N = w[key].shape[-1]
-                    elif 1 == dim:
-                        rows = 1
-                        N = len(w[key])
-                    # 记录 N
-                    weights_numbers[key] = torch.tensor(N)
-
-                    # M << N
-                    M = int(N * args.compression_ratio)
-                    # 测量矩阵
-                    Phi = torch.randn(M, N) #* math.sqrt(1 / M)
-                    # 记录每一层使用的测量矩阵（每一行使用相同的测量矩阵，只记录一次）
-                    # Phi_log[key] = Phi
-
-                    # 一行一行地处理
-                    if 1 < rows:
-                        # 堆叠每一行的 y
-                        y_matrix = None
-                        for row in range(rows):
-                            # 压缩
-                            y = torch.mm(Phi, w[key][row].reshape((-1, 1)))     # (M, 1)
-
-
-                            '''Step-2.3 : 自适应参数扰动'''
-                            # epsilon 张量化
-                            epsilon = epsilon_user + torch.zeros_like(y)
-
-                            # 获取每一层参数中的最小值和最大值
-                            min_weight = torch.min(y)
-                            max_weight = torch.max(y)
-                            # 每一层权重或偏置的变化范围 [c-r,c+r]
-                            center = (max_weight - min_weight) / 2  # + torch.zeros_like(y)
-                            radius = max_weight - center  # + torch.zeros_like(y)
-                            # 参数与 center 之间的距离 μ
-                            miu = y - center
-
-                            # 伯努利采样概率 Pr[u=1]
-                            # Pr = ((y - center) * (torch.exp(epsilon) - 1) + radius * (torch.exp(epsilon) + 1)) / 2 * radius * (torch.exp(epsilon) + 1)
-                            # 伯努利变量
-                            u = torch.bernoulli(torch.rand(y.shape))
-
-                            # 自适应扰动
-                            for i in range(len(y)):
-                                if u[i] == 1.:
-                                    y[i] = center + miu[i] * (math.exp(epsilon_user) + 1) / (math.exp(epsilon_user) - 1)
-                                elif u[i] == 0.:
-                                    y[i] = center - miu[i] * (math.exp(epsilon_user) + 1) / (math.exp(epsilon_user) - 1)
-
-
-                            if y_matrix is None:
-                                y_matrix = copy.deepcopy(y)
-                            else:
-                                y_matrix = torch.hstack((y_matrix, y))
-
-                        # 更新每一层扰动后的参数
-                        w[key] = y_matrix.t()   # (rows, M)
-
-                    elif 1 == rows:
-                        y = torch.mm(Phi, w[key].reshape((-1, 1)))
-                        # print(y)
-
-
-                        '''Step-2.3 : 自适应参数扰动'''
-                        # epsilon 张量化
-                        epsilon = epsilon_user + torch.zeros_like(y)
-
-                        # 获取每一层参数中的最小值和最大值
-                        min_weight = torch.min(y)
-                        max_weight = torch.max(y)
-                        # 每一层权重或偏置的变化范围 [c-r,c+r]
-                        center = (max_weight - min_weight) / 2  # + torch.zeros_like(y)
-                        radius = max_weight - center  # + torch.zeros_like(y)
-                        # 参数与 center 之间的距离 μ
-                        miu = y - center
-
-                        # 伯努利采样概率 Pr[u=1]
-                        # Pr = ((y - center) * (torch.exp(epsilon) - 1) + radius * (torch.exp(epsilon) + 1)) / 2 * radius * (torch.exp(epsilon) + 1)
-                        # 伯努利变量
-                        u = torch.bernoulli(torch.rand(y.shape))
-
-                        # 自适应扰动
-                        for i in range(len(y)):
-                            if u[i] == 1.:
-                                y[i] = center + miu[i] * (math.exp(epsilon_user) + 1) / (math.exp(epsilon_user) - 1)
-                            elif u[i] == 0.:
-                                y[i] = center - miu[i] * (math.exp(epsilon_user) + 1) / (math.exp(epsilon_user) - 1)
-
-                        # 更新每一层扰动后的参数
-                        w[key] = y.t()
-
-            elif args.model == 'cnn':
-                for key,_ in list(w.items()):
-                    # break
-                    # print('key: ', key, 'w: ', w[key])
-                    # 每一层权重个数
+                    
                     N = w[key].numel()
-
                     weights_numbers[key] = torch.tensor(N)
-
-                    # M << N
                     M = max(int(args.compression_ratio * N), 1)
 
-
-                    # if np.size(Psi_log[key]) == 1:
-                    #     # # 稀疏基矩阵(DCT)
-                    #     # Psi = np.zeros((N, N))
-                    #     # for k in range(N):
-                    #     #     t = np.zeros((N, 1))
-                    #     #     t[k] = 1
-                    #     #     t = cv.idct(t)
-                    #     #     Psi[:, k] = np.squeeze(t)
-                    #     ''''''
-                    #     # # DCT     非正交
-                    #     # Psi = np.zeros((N, N))
-                    #     # v = range(N)
-                    #     # for k in range(N):
-                    #     #     dct_1d = np.cos(np.dot(v, k * math.pi / N))  # (N,)
-                    #     #     if k > 0:
-                    #     #         dct_1d = dct_1d - np.mean(dct_1d)
-                    #     #     Psi[:, k] = dct_1d / np.linalg.norm(dct_1d)
-                    #     ''''''
-                    #     # 单位矩阵
-                    #     # Psi = np.eye(N)
-                    #     ''''''
-                    #     # DCT   正交
-                    #     Psi = np.zeros((N, N))
-                    #     Psi[0, :] = np.ones((1, N)) / np.sqrt(N)  # 第一行为常数
-                    #     for i in range(1, N):
-                    #         for j in range(N):
-                    #             Psi[i, j] = np.sqrt(2) * np.cos((2 * j + 1) * i * np.pi / (2 * N)) / np.sqrt(N)
-                    #     ''''''
-                    #     # FFT
-                    #     # Psi = np.linalg.inv(np.fft.fft(np.eye(N)))
-                    #
-                    #     # Psi_log[key] = torch.from_numpy(Psi)
-                    #     Psi_log[key] = Psi
-                    #
-                    #     # print('key: ', key,'\t Psi: ', Psi_log[key])
-                    #     # print('key: ', key,'\t Psi * Psi.T: ', torch.mm(Psi_log[key], Psi_log[key].t()))
-
-                    # inv_Psi = np.linalg.inv(Psi_log[key].numpy())
-                    # print(np.dot(Psi_log[key].numpy(), inv_Psi))
-
-                    # 原始数据的稀疏表示
-                    # s = np.dot(inv_Psi, w[key].reshape((-1, 1)).numpy())
-                    # print('w[key]: ', w[key].reshape((-1, 1)), 's: ', s)
-
-                    # print('w[key]: ',w[key], 'Psi * s: ', np.dot(Psi_log[key].numpy(),s))
-
-                    # if np.size(Phi_log[key]) == 1:
-                    #     # Phi = (np.sign(np.random.randn(M, N)) + np.ones((M, N))) / 2  # 观测矩阵
-                    #
-                    #     Phi = np.random.randn(M, N) * math.sqrt(1 / N)
-                    #
-                    #     # Psi_shuffle = np.random.permutation(Psi_log[key].numpy())
-                    #     # # print('Psi_shuffle: ', Psi_shuffle)
-                    #     # Phi = Psi_shuffle[:M, :]
-                    #
-                    #     # # DCT
-                    #     # Phi_N = np.zeros((N, N))
-                    #     # Phi_N[0, :] = np.ones((1, N)) / math.sqrt(N)  # 第一行为常数
-                    #     # for i in range(1, N):
-                    #     #     for j in range(N):
-                    #     #         Phi_N[i, j] = math.sqrt(2) * np.cos((2 * j + 1) * i * math.pi / (2 * N)) / math.sqrt(N)
-                    #     # Phi = Phi_N[:M, :]
-                    #
-                    #     # # 部分 FFT
-                    #     # Phi_t = np.fft.fft(np.eye(N)) / np.sqrt(N)
-                    #     # Phi_t_shuffle = np.random.permutation(Phi_t)
-                    #     # Phi = Phi_t_shuffle[:M, :]
-                    #     # for i in range(N):
-                    #     #     Phi[:, i] = Phi[:, i] / np.linalg.norm(Phi[:, i])
-                    #
-                    #     # Phi_log[key] = torch.from_numpy(Phi)
-                    #     Phi_log[key] = Phi
-                    #
-                    #     # print('key: ', key, '\t Phi: ', Phi_log[key])
-
-                    # if np.size(theta_log[key]) == 1:
-                    #     theta = np.dot(Phi_log[key], Psi_log[key])    # M * N
-                    #     theta_log[key] = theta
-                    #
-                    #     # print('key: ', key, '\t theta: ', theta_log[key])
-
-
-                    # y = torch.mm(torch.from_numpy(Phi_log[key]), w[key].reshape((-1, 1)))
-                    # y = torch.mm(theta_log[key], torch.from_numpy(s))
                     ''''''
                     # y = w[key].numpy().reshape((-1, 1))[:M, :]
                     ''''''
