@@ -94,59 +94,38 @@ if __name__ == '__main__':
                         e = e - int(N / M) * int(epoch / int(N / M))
                     y = w_dct[e * M:min((e + 1) * M, N), :]
 
-                    # print('key: ', key, '\t y: ', y[-1, :])
-
-                    '''差分隐私'''
-                    # epsilon 张量化
                     epsilon_user = args.epsilon + np.zeros_like(y)
 
                     min_weight = min(y)
                     max_weight = max(y)
-                    # 每一层权重或偏置的变化范围 [c-r,c+r]
                     center = (max_weight + min_weight) / 2  # + torch.zeros_like(y)
                     radius = (max_weight - center) if (max_weight - center) != 0. else 1  # + torch.zeros_like(y)
-                    # print(center, radius)
-                    # 参数与 center 之间的距离 μ
                     miu = y - center
-                    # print('miu: ', miu)
-
-                    # 伯努利采样概率 Pr[u=1]
-                    # Pr = ((y - center) * (np.exp(epsilon_user) - 1) + radius * (np.exp(epsilon_user) + 1)) / (2 * radius * (np.exp(epsilon_user) + 1))
                     Pr = (np.exp(epsilon_user) - 1) / (2 * np.exp(epsilon_user))
-                    # print('Pr: ', Pr)
-                    # 伯努利变量
                     u = np.zeros_like(y)
                     for i in range(len(y)):
                         u[i, 0] = np.random.binomial(1, Pr[i, :])
-                    # print('u: ', u)
 
-                    # 自适应扰动
-                    # for i in range(len(y)):
-                    #     if u[i, 0] > 0:
-                    #         y[i, :] = center + miu[i, :] * ((np.exp(epsilon_user[i, :]) + 1) / (np.exp(epsilon_user[i, :]) - 1))
-                    #     else:
-                    #         y[i, :] = center + miu[i, :] * ((np.exp(epsilon_user[i, :]) - 1) / (np.exp(epsilon_user[i, :]) + 1))
+                    for i in range(len(y)):
+                        if u[i, 0] > 0:
+                            y[i, :] = center + miu[i, :] * ((np.exp(epsilon_user[i, :]) + 1) / (np.exp(epsilon_user[i, :]) - 1))
+                        else:
+                            y[i, :] = center + miu[i, :] * ((np.exp(epsilon_user[i, :]) - 1) / (np.exp(epsilon_user[i, :]) + 1))
 
                     #     if u[i, 0] > 0:
                     #         y[i, :] = center + radius * ((np.exp(epsilon_user) + 1) / (np.exp(epsilon_user) - 1))
                     #     else:
                     #         y[i, :] = center - radius * ((np.exp(epsilon_user) + 1) / (np.exp(epsilon_user) - 1))
-                    # y = center + miu * (np.exp(epsilon_user) + 1) / (np.exp(epsilon_user) - 1)
-                    # y = center + miu * (np.exp(epsilon_user) - 1) / (np.exp(epsilon_user) + 1)
 
                     w[key] = torch.from_numpy(y)
-                ######################################################
 
-
-            # break
             local_weights.append(copy.deepcopy(w))
             local_losses.append(copy.deepcopy(loss))
 
             print(f'| client-{index + 1} : {k} finished!!! |')
             index += 1
-        # break
+            
         print(f'\n | Client Training End!!! | \n')
-
 
         '''Step-3 : 服务器端更新全局模型'''
         '''Step-3.1 : 平均聚合本地模型'''
