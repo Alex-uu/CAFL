@@ -127,135 +127,19 @@ if __name__ == '__main__':
             
         print(f'\n | Client Training End!!! | \n')
 
-        '''Step-3 : 服务器端更新全局模型'''
-        '''Step-3.1 : 平均聚合本地模型'''
-        # 获取聚合前的全局模型每一层的形状
+
         shapes_global = copy.deepcopy(global_weights)
         for key,_ in list(shapes_global.items()):
             shapes_global[key] = shapes_global[key].shape
-            # print(shapes_global[key])
-        # break
 
-        # print(local_weights)
-
-
-        ''''''
-        # global_weights_ = average_weights(local_weights_)
-        # print('未压缩的全局模型：', global_weights_)
         partial_global_weights = average_weights(local_weights)
-        # for key,_ in partial_global_weights.items():
-        #     print(partial_global_weights[key].shape)
-        # print('压缩后、重构前的全局模型：', partial_global_weights)
-        # break
-
-        # 计算本轮通信的平均损失
+        
         avg_loss = sum(local_losses) / len(local_losses)
         train_loss.append(avg_loss)
 
-
-        '''Step-3.2 : 计算动量和误差反馈'''
-        # ########################
-        # if Monmentum == None and error == None:
-        #     Monmentum = copy.deepcopy(global_weights)
-        #     error = copy.deepcopy(global_weights)
-        #
-        #     for key,_ in list(Monmentum.items()):
-        #         zeros_tensor = torch.zeros_like(Monmentum[key])
-        #         Monmentum[key] = zeros_tensor
-        #         zeros_tensor = torch.zeros_like(error[key])
-        #         error[key] = zeros_tensor
-        # ########################
-        # for key,_ in list(global_weights.items()):
-        #     Monmentum[key] = rho * Monmentum[key] + global_weights[key]
-        #     error[key] = eta * Monmentum[key] + error[key]
-        #     # print('key: ', key,'error: ', error[key])
-        #     # print(error[key].shape)
-        #     # break
-        #
-        #
-        #     '''Step-3.3 : 重构全局模型（解压缩）'''
-        #     N = weights_numbers[key].item()
-        #     M = max(int(args.compression_ratio * N), 1)
-        #
-        #     ''''''
-        #     # if args.model == 'mlp':
-        #     #     # 重构（同样一行一行地处理）
-        #     #     # 获取当前层的参数张量的维度
-        #     #     dim = error[key].ndim
-        #     #     # print(dim)
-        #     #
-        #     #     # 获取当前层的行数 rows
-        #     #     if dim > 1:
-        #     #         rows = error[key].shape[0]
-        #     #     elif dim == 1:
-        #     #         rows = 1
-        #     #
-        #     #     if 1 < rows:
-        #     #         # 堆叠重构后的每一行 y_hat
-        #     #         y_hat_matrix = None
-        #     #         for row in range(rows):
-        #     #             s_start = np.dot(theta.T, error[key][row].reshape((-1, 1)).numpy())
-        #     #             s_finish = l1eq_pd(np.squeeze(s_start), np.squeeze(theta), [], np.squeeze(error[key][row].reshape((-1, 1)).numpy().T), 1e-3)
-        #     #             # 重构后
-        #     #             y_hat = np.dot(Psi, s_finish)
-        #     #             # print(y_hat)
-        #     #             # print(y_hat.shape)    # (1, N)
-        #     #
-        #     #             if y_hat_matrix is None:
-        #     #                 y_hat_matrix = copy.deepcopy(torch.from_numpy(y_hat))
-        #     #             else:
-        #     #                 y_hat_matrix = torch.vstack((y_hat_matrix, torch.from_numpy(y_hat)))
-        #     #
-        #     #         # 更新全局模型参数
-        #     #         global_weights[key] = y_hat_matrix
-        #     #
-        #     #     elif 1 == rows:
-        #     #         s_start = np.dot(theta.T, error[key].reshape((-1, 1)).numpy())
-        #     #         s_finish = l1eq_pd(np.squeeze(s_start), np.squeeze(theta), [], np.squeeze(error[key].reshape((-1, 1)).numpy().T), 1e-3)
-        #     #         # 重构后
-        #     #         y_hat = np.dot(Psi, s_finish)
-        #     #         # print(y_hat.shape)
-        #     #
-        #     #         global_weights[key] = torch.from_numpy(y_hat.reshape(shapes_global[key]))
-        #     #
-        #     # elif args.model == 'cnn':
-        #     #     s_start = np.dot(theta_log[key].T, error[key].numpy())
-        #     #     s_finish = l1eq_pd(np.squeeze(s_start), np.squeeze(theta), [],
-        #     #                        np.squeeze(error[key].numpy()), 1e-3)
-        #     #     # 重构后
-        #     #     x_rec = np.dot(Psi_log[key], s_finish)
-        #     #
-        #     #     global_weights[key] = torch.from_numpy(x_rec.reshape(shapes_global[key]))
-        #
-        #     ''''''
-        #     ####### OMP
-        #     ''''''
-        #     # A = theta
-        #     # K = N
-        #     # y_rec = cs_omp(error[key].numpy(), A, K)
-        #     # global_weights[key] = torch.from_numpy(y_rec.reshape(shapes_global[key]))
-        #     ''''''
-        #     # s_rec = cs_omp_1(error[key].numpy(), copy.deepcopy(theta_log[key]), N)
-        #     # print('s_rec: ', s_rec)
-        #     # x_rec = np.dot(Psi_log[key], s_rec)
-        #     # print('x_rec: ', x_rec)
-        #     ''''''
-        #     # 重建矩阵
-        #     rec_matrix = np.zeros((N, 1))
-        #     rec_matrix[:M, :] = error[key]
-        #     x_rec = idct(rec_matrix)
-        #     global_weights[key] = torch.from_numpy(x_rec.reshape(shapes_global[key]))
-        #
-        #     print('key: ', key, '\t global_weights: ', global_weights[key].shape)
-
-        # 重构
-
-
         for key,_ in partial_global_weights.items():
-            # break
             N = weights_numbers[key].item()
             M = max(int(args.compression_ratio * N), 1)
-            # 重构矩阵
             rec_matrix = np.zeros((N, 1))
             e = epoch
             if e >= int(N / M):
@@ -270,75 +154,20 @@ if __name__ == '__main__':
 
             print('key: ', key, '\t global_weights: ', global_weights[key].shape)
 
-
-        # break
-        # print('压缩后、重构后的全局模型：', global_weights)
         global_model.load_state_dict(global_weights)
         # global_model.load_state_dict(partial_global_weights)
         print(f'\n | Global Training Round : {epoch + 1} finished!!!!!!!!|\n')
 
-
-        '''Step-3.4 : 误差累积'''
-        # 对重构后的全局模型再压缩
-        # if args.model == 'mlp':
-        #     for key,_ in list(global_weights.items()):
-        #         ###################################################### 一行一行地处理
-        #         # 获取当前层的参数张量的维度
-        #         dim = global_weights[key].ndim
-        #
-        #         # 获取当前层的行数 rows 、每一行所拥有的参数个数 N
-        #         if dim > 1:
-        #             rows = global_weights[key].shape[0]
-        #             N = global_weights[key].shape[-1]
-        #         elif dim == 1:
-        #             rows = 1
-        #             N = len(global_weights[key])
-        #
-        #         # M << N
-        #         M = int(N * args.compression_ratio)
-        #         # 测量矩阵
-        #         Phi = math.sqrt(1 / M) * torch.randn(M, N)
-        #
-        #         if 1 < rows:
-        #             for row in range(rows):
-        #                 # 压缩
-        #                 y = torch.mm(Phi, global_weights[key][row].reshape((-1, 1)))    # (M, 1)
-        #
-        #                 # 误差累积
-        #                 error[key][row] = error[key][row] - y.reshape((1, -1))
-        #         elif 1 == rows:
-        #             y = torch.mm(Phi, global_weights[key].reshape((-1, 1)))
-        #             error[key] = error[key] - y.reshape((1, -1))
-        #
-        # elif args.model == 'cnn':
-        #     for key, _ in list(global_weights.items()):
-        #         # inv_Psi = np.linalg.inv(Psi_log[key])
-        #         # s = np.dot(inv_Psi, global_weights[key].reshape((-1, 1)).numpy())
-        #         # y = np.dot(Phi_log[key], global_weights[key].reshape((-1, 1)).numpy())
-        #
-        #         N = weights_numbers[key].item()
-        #         M = max(int(args.compression_ratio * N), 1)
-        #         y_dct = dct(global_weights[key].numpy().reshape((-1, 1)))
-        #         y = torch.from_numpy(y_dct[:M, :])
-        #
-        #         # 误差累积
-        #         error[key] = error[key] - y
-
-
-        '''评估一轮通信后的全局模型'''
         list_acc, list_loss = [], []
         global_model.eval()
-        # 在所有客户端上计算每一轮通信的平均训练精确率
         for k in range(args.num_users):
             local_model = LocalUpdate(args=args, dataset=train_dataset,
                                       index_of_samples=user_samples[k])
             acc, loss = local_model.inference(model=global_model)
             list_acc.append(acc)
             list_loss.append(loss)
-        # 计算所有客户端上评估后的平均精确率
         train_accuracy.append(sum(list_acc) / len(list_acc))
 
-        # 打印每一轮通信后的平均全局训练损失和精确率
         print(f'\nAvg Training States after {epoch + 1} global rounds:')
         print(f'Avg Training Loss : {train_loss[-1]}')
         print('Avg Training Accuracy : {:.2f}% \n'.format(100 * train_accuracy[-1]))
@@ -348,9 +177,6 @@ if __name__ == '__main__':
             train_accuracy.pop()
             break
 
-
-
-    '''通信结束'''
     test_acc, test_loss = test_inference(args, global_model, test_dataset)
 
     print(f' \n Results after {args.epochs} global rounds of training:')
@@ -361,8 +187,7 @@ if __name__ == '__main__':
     runtime = time.time() - start_time
     print(('\n Total Run Time: {0:0.4f}'.format(runtime)))
 
-
-    # 保存数据到 log
+    
     data_log= {'Train Loss' : train_loss, 'Train Accuracy' : train_accuracy,
                'Test Loss' : test_loss, 'Test Accuracy' : test_acc}
     record = pd.DataFrame(data_log)
