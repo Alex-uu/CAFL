@@ -88,9 +88,6 @@ if __name__ == '__main__':
                     weights_numbers[key] = torch.tensor(N)
                     M = max(int(args.compression_ratio * N), 1)
 
-                    ''''''
-                    # y = w[key].numpy().reshape((-1, 1))[:M, :]
-                    ''''''
                     w_dct = dct(w[key].numpy().reshape((-1, 1)))
                     e = epoch
                     if e >= int(N / M):
