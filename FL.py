@@ -98,8 +98,8 @@ if __name__ == '__main__':
 
                     min_weight = min(y)
                     max_weight = max(y)
-                    center = (max_weight + min_weight) / 2  # + torch.zeros_like(y)
-                    radius = (max_weight - center) if (max_weight - center) != 0. else 1  # + torch.zeros_like(y)
+                    center = (max_weight + min_weight) / 2
+                    radius = (max_weight - center) if (max_weight - center) != 0. else 1
                     miu = y - center
                     Pr = (np.exp(epsilon_user) - 1) / (2 * np.exp(epsilon_user))
                     u = np.zeros_like(y)
@@ -191,7 +191,7 @@ if __name__ == '__main__':
     data_log= {'Train Loss' : train_loss, 'Train Accuracy' : train_accuracy,
                'Test Loss' : test_loss, 'Test Accuracy' : test_acc}
     record = pd.DataFrame(data_log)
-    record.to_csv('../log/CIFAR/p_fed_{}_{}_E[{}]_iid[{}{}]_CR[{}]_epsilon[{}].csv'.
+    record.to_csv('../log/MNIST/fed_{}_{}_E[{}]_iid[{}{}]_CR[{}]_epsilon[{}].csv'.
                 format(args.dataset, args.model, args.epochs, args.iid, args.unequal, args.compression_ratio, args.epsilon))
 
 
@@ -213,5 +213,5 @@ if __name__ == '__main__':
     plt.plot(list(range(len(train_accuracy))), train_accuracy)
     plt.ylabel('Average Accuracy')
     plt.xlabel('Communication Rounds')
-    plt.savefig('../save/CIFAR/p_fed_{}_{}_E[{}]_iid[{}{}]_CR[{}]_epsilon[{}].png'.
+    plt.savefig('../save/MNIST/fed_{}_{}_E[{}]_iid[{}{}]_CR[{}]_epsilon[{}].png'.
                 format(args.dataset, args.model, args.epochs, args.iid, args.unequal, args.compression_ratio, args.epsilon))
